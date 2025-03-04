@@ -12,6 +12,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Copy } from "lucide-react";
 import { callOllamaAPI, callNutanixAPI, Integration } from "@/lib/apiHelper";
 
 // Mapping for token sizes to max tokens.
@@ -37,10 +39,26 @@ export default function ChatPage() {
   const [loadingIntegrations, setLoadingIntegrations] = useState<boolean>(true);
   const [tokenSize, setTokenSize] = useState<TokenSize>("medium");
 
+  // State for the Prompt Library.
+  const [promptLibraryExpanded, setPromptLibraryExpanded] = useState<boolean>(false);
+  const [promptLibrary, setPromptLibrary] = useState<string[]>([
+    "Tell me a joke.",
+    "What is the meaning of life?",
+    "How do I improve productivity?",
+    "Summarize today's news.",
+    "Give me a recipe for pasta.",
+    "Explain quantum physics simply.",
+    "What are the benefits of exercise?",
+    "How to manage time effectively?",
+    "Suggest a good book to read.",
+    "What's new in tech?"
+  ]);
+  const [newPrompt, setNewPrompt] = useState<string>("");
+
   // Ref for auto-scrolling chat conversation.
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when messages change.
+  // Auto-scroll to bottom when messages update.
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -86,8 +104,6 @@ export default function ChatPage() {
       console.error("Error in API call:", error);
       botResponse = error.message || "Error calling API.";
     }
-
-    // Append the bot's response.
     setMessages((prev) => [...prev, { role: "bot", text: botResponse }]);
   }
 
@@ -153,23 +169,28 @@ export default function ChatPage() {
         style={{ resize: "both" }}
       >
         {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`mb-2 ${msg.role === "user" ? "text-right" : "text-left"}`}
-          >
+          <div key={idx} className="relative mb-2">
             <span
               style={{ whiteSpace: "pre-wrap" }}
-              className={`inline-block p-3 rounded ${
-                msg.role === "user" ? "bg-blue-200" : "bg-green-200"
-              }`}
+              className={`inline-block p-3 pr-8 rounded ${msg.role === "user" ? "bg-blue-200" : "bg-green-200"}`}
             >
               {msg.text}
             </span>
+            {msg.role === "bot" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute bottom-1 right-1 p-1"
+                onClick={() => navigator.clipboard.writeText(msg.text)}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Chat Input */}
+      {/* Chat Input and Send Button */}
       <form onSubmit={handleSendMessage} className="flex space-x-2 mb-6">
         <Input
           type="text"
@@ -182,6 +203,51 @@ export default function ChatPage() {
           Send
         </Button>
       </form>
+
+      {/* Expandable Prompt Library */}
+      <div className="mb-6">
+        <Button variant="outline" onClick={() => setPromptLibraryExpanded(!promptLibraryExpanded)}>
+          Prompt Library {promptLibraryExpanded ? "▲" : "▼"}
+        </Button>
+        {promptLibraryExpanded && (
+          <div className="mt-2">
+            <div className="flex flex-wrap gap-2">
+              {promptLibrary.map((prompt, index) => (
+                <Card
+                  key={index}
+                  onClick={() =>
+                    setMessageInput((prev) => (prev ? prev + " " + prompt : prompt))
+                  }
+                  className="w-60 cursor-pointer hover:bg-gray-100"
+                >
+                  <CardHeader>
+                    <CardTitle className="text-sm">{prompt}</CardTitle>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+            <div className="mt-4 flex items-center space-x-2">
+              <Input
+                type="text"
+                placeholder="Add a new prompt..."
+                value={newPrompt}
+                onChange={(e) => setNewPrompt(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                onClick={() => {
+                  if (newPrompt.trim()) {
+                    setPromptLibrary((prev) => [...prev, newPrompt.trim()]);
+                    setNewPrompt("");
+                  }
+                }}
+              >
+                Add Prompt
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
