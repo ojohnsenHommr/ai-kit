@@ -45,11 +45,11 @@ export default function TranslatePage() {
     setOutputText("");
 
     // Build a prompt based on the translation direction.
-    // For CorporateToNormal, instruct the AI to be funny and a bit rude.
+    // The prompt instructs the AI to produce only the translation without any warnings or notes.
     const prompt =
       translationDirection === "CorporateToNormal"
-        ? `Translate the following corporate language text to a funny and slightly rude everyday tone:\n\n"${inputText}"`
-        : `Translate the following text from everyday language to formal, corporate language:\n\n"${inputText}"`;
+        ? `Translate the following corporate language text to a funny, everyday tone that is a bit direct and slightly rude. Do not include any warnings, notes, or extra commentary – only provide the translated text:\n\n"${inputText}"`
+        : `Translate the following everyday language text to formal, corporate language. Do not include any warnings, notes, or extra commentary – only provide the translated text:\n\n"${inputText}"`;
 
     try {
       let response = "";
