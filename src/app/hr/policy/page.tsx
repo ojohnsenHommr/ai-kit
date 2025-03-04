@@ -8,52 +8,52 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Copy, Volume2 } from "lucide-react";
 import { useSpeechSynthesis } from "react-speech-kit";
 import { callOllamaAPI, callNutanixAPI, Integration } from "@/lib/apiHelper";
 
-type TranslationDirection = "CorporateToNormal" | "NormalToCorporate";
-
-export default function TranslatePage() {
+export default function PolicySimplifierPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
-  const [translationDirection, setTranslationDirection] = useState<TranslationDirection>("CorporateToNormal");
   const [inputText, setInputText] = useState<string>("");
   const [outputText, setOutputText] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
   const { speak, voices } = useSpeechSynthesis();
-  // Select a natural-sounding English voice if available.
   const englishVoice = voices.find((v) => v.lang.startsWith("en")) || undefined;
 
-  useEffect(() => {
-    async function fetchIntegrations() {
-      const res = await fetch("/api/integrations");
-      if (res.ok) {
-        const data: Integration[] = await res.json();
-        setIntegrations(data);
-        if (data.length > 0) setSelectedIntegration(data[0]);
-      }
+  // Sample policies for demonstration.
+  const samplePolicies = [
+    `All employees must adhere to the company dress code which mandates business casual attire during office hours. Any deviation must be pre-approved by HR.`,
+    `Employees are required to clock in and out using the official timekeeping system. Unauthorized overtime will not be compensated unless pre-approved by management.`,
+    `Returning to Office Policy: All employees must return to the office effective immediately. No home office exceptions are permitted, except in cases of emergency as determined by HR.`
+  ];
+
+  async function fetchIntegrations() {
+    const res = await fetch("/api/integrations");
+    if (res.ok) {
+      const data: Integration[] = await res.json();
+      setIntegrations(data);
+      if (data.length > 0) setSelectedIntegration(data[0]);
     }
+  }
+
+  useEffect(() => {
     fetchIntegrations();
   }, []);
 
-  async function handleTranslate(e: FormEvent) {
+  async function handleSimplifyPolicy(e: FormEvent) {
     e.preventDefault();
     if (!inputText.trim() || !selectedIntegration) return;
     setLoading(true);
     setOutputText("");
 
-    // Build a prompt based on the translation direction.
-    // In CorporateToNormal, instruct the AI to be brutally honest, irreverent, and unapologetically rude.
-    const prompt =
-      translationDirection === "CorporateToNormal"
-        ? `Translate the following corporate language text into an irreverently funny, brutally honest, and unapologetically rude everyday version. Do not include any warnings or notes—just the translated text:\n\n"${inputText}"`
-        : `Translate the following everyday text into polished, formal corporate language. Do not include any warnings or notes—just the translated text:\n\n"${inputText}"`;
+    // Build a prompt that instructs the AI to simplify the policy text with humorous commentary.
+    const prompt = `Simplify the following corporate policy into plain language, but also add a funny, brutally honest commentary that reveals what's really going on behind the corporate jargon. Do not include any warnings, notes, or extra commentary—only the simplified text and its humorous, candid explanation:\n\n"${inputText}"`;
 
     try {
       let response = "";
@@ -66,8 +66,8 @@ export default function TranslatePage() {
       }
       setOutputText(response);
     } catch (error: any) {
-      console.error("Translation API error:", error);
-      setOutputText(error.message || "Error calling translation API.");
+      console.error("Policy Simplifier API error:", error);
+      setOutputText(error.message || "Error calling policy simplifier API.");
     } finally {
       setLoading(false);
     }
@@ -75,11 +75,13 @@ export default function TranslatePage() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
-      <h1 className="text-4xl font-extrabold text-center text-gray-900">Corp.inc translator</h1>
+      <h1 className="text-4xl font-extrabold text-center text-gray-900">Policy Simplifier</h1>
 
       {/* Integration Selector */}
       <div className="space-y-2">
-        <Label htmlFor="integrationSelect" className="text-lg font-medium">Select model:</Label>
+        <Label htmlFor="integrationSelect" className="text-lg font-medium">
+          Select Integration:
+        </Label>
         <Select
           value={selectedIntegration?.id || ""}
           onValueChange={(value: string) => {
@@ -100,29 +102,12 @@ export default function TranslatePage() {
         </Select>
       </div>
 
-      {/* Translation Direction Selector */}
-      <div className="space-y-2">
-        <Label htmlFor="translationDirection" className="text-lg font-medium">Translation Direction:</Label>
-        <Select
-          value={translationDirection}
-          onValueChange={(value: string) => setTranslationDirection(value as TranslationDirection)}
-        >
-          <SelectTrigger id="translationDirection" className="w-64 border border-gray-300 rounded-md shadow-sm">
-            <SelectValue placeholder="Select translation direction" />
-          </SelectTrigger>
-          <SelectContent className="rounded-md shadow-lg">
-            <SelectItem value="CorporateToNormal">Corporate → Normal</SelectItem>
-            <SelectItem value="NormalToCorporate">Normal → Corporate</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* Input Text Area with Speaker Button */}
       <div className="space-y-2">
-        <Label className="text-lg font-medium">Input Text:</Label>
+        <Label className="text-lg font-medium">Policy Text:</Label>
         <div className="relative">
           <Textarea
-            placeholder="Enter text to translate..."
+            placeholder="Paste your corporate policy text here..."
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             className="w-full h-40 border border-gray-300 rounded-md shadow-sm"
@@ -142,20 +127,20 @@ export default function TranslatePage() {
         </div>
       </div>
 
-      {/* Translate Button */}
+      {/* Simplify Policy Button */}
       <div>
-        <Button onClick={handleTranslate} disabled={loading} className="w-full py-3 text-lg">
-          {loading ? "Translating..." : "Translate"}
+        <Button onClick={handleSimplifyPolicy} disabled={loading} className="w-full py-3 text-lg">
+          {loading ? "Simplifying..." : "Simplify Policy"}
         </Button>
       </div>
 
       {/* Output Text Area with Copy & Speaker Buttons */}
       <div className="space-y-2">
-        <Label className="text-lg font-medium">Translated Output:</Label>
+        <Label className="text-lg font-medium">Simplified Policy:</Label>
         <div className="relative">
           <Textarea
             readOnly
-            placeholder="Translation will appear here..."
+            placeholder="The simplified policy will appear here..."
             value={outputText}
             className="w-full h-40 pr-16 border border-gray-300 rounded-md shadow-sm"
           />
@@ -181,6 +166,26 @@ export default function TranslatePage() {
               </Button>
             </>
           )}
+        </div>
+      </div>
+
+      {/* Example Policies Section */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">Example Policies</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {samplePolicies.map((policy, index) => (
+            <Card
+              key={index}
+              onClick={() => setInputText(policy)}
+              className="cursor-pointer hover:shadow-xl transition-shadow"
+            >
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold">
+                  Example Policy {index + 1}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+          ))}
         </div>
       </div>
     </div>
