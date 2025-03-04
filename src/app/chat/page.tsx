@@ -1,7 +1,7 @@
 // src/app/chat/page.tsx
 "use client";
 
-import React, { useEffect, useState, FormEvent } from "react";
+import React, { useEffect, useState, useRef, FormEvent } from "react";
 import {
   Select,
   SelectContent,
@@ -12,8 +12,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { callOllamaAPI, callNutanixAPI, Integration } from "@/lib/apiHelper";
 
-// Mapping for T-shirt sizes to max tokens.
+// Mapping for token sizes to max tokens.
 const tokenMapping = {
   small: 256,
   medium: 512,
@@ -23,15 +24,6 @@ const tokenMapping = {
 
 type TokenSize = keyof typeof tokenMapping;
 
-interface Integration {
-  id: string;
-  name: string;
-  type: string;
-  endpoint: string;
-  apiKey: string;
-  active: boolean;
-}
-
 interface Message {
   role: "user" | "bot";
   text: string;
@@ -39,13 +31,21 @@ interface Message {
 
 export default function ChatPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [selectedIntegration, setSelectedIntegration] =
-    useState<Integration | null>(null);
+  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const [messageInput, setMessageInput] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState<boolean>(true);
-  // State for token size (only used for Nutanix integration)
   const [tokenSize, setTokenSize] = useState<TokenSize>("medium");
+
+  // Ref for auto-scrolling chat conversation.
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages change.
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   // Fetch integrations on mount.
   useEffect(() => {
@@ -67,111 +67,28 @@ export default function ChatPage() {
     e.preventDefault();
     if (!messageInput.trim() || !selectedIntegration) return;
 
-    // Append the user's message.
+    // Append the user's message and clear the input immediately.
     setMessages((prev) => [...prev, { role: "user", text: messageInput }]);
+    const userPrompt = messageInput;
+    setMessageInput("");
 
-    const integrationType = selectedIntegration.type;
     let botResponse = "";
-
-    if (integrationType === "ollama") {
-      // Build the full URL by appending '/api/generate' to the endpoint.
-      const url =
-        selectedIntegration.endpoint.replace(/\/$/, "") + "/api/generate";
-      const payload = {
-        model: "mistral", // Adjust as needed.
-        prompt: messageInput,
-      };
-
-      console.log("Ollama API Request URL:", url);
-      console.log("Ollama API Request Payload:", payload);
-
-      try {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        console.log("Ollama API Response Status:", response.status);
-        const responseText = await response.text();
-        console.log("Ollama API Raw Response:", responseText);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${responseText}`);
-        }
-
-        // Process streaming response: split by newline and parse each JSON object.
-        const lines = responseText
-          .split("\n")
-          .filter((line) => line.trim() !== "");
-        let combinedResponse = "";
-        lines.forEach((line) => {
-          try {
-            const parsed = JSON.parse(line);
-            combinedResponse += parsed.response;
-          } catch (err) {
-            console.error("Error parsing line:", line, err);
-          }
-        });
-        // Insert newlines before numbered items for readability.
-        const formattedResponse = combinedResponse
-          .replace(/(\d+\.\s)/g, "\n$1")
-          .trim();
-        botResponse = formattedResponse || "No response from Ollama API.";
-      } catch (error) {
-        console.error("Error calling Ollama API:", error);
-        botResponse = "Error calling Ollama API.";
+    try {
+      if (selectedIntegration.type === "ollama") {
+        botResponse = await callOllamaAPI(selectedIntegration, userPrompt);
+      } else if (selectedIntegration.type === "nutanix") {
+        const maxTokens = tokenMapping[tokenSize];
+        botResponse = await callNutanixAPI(selectedIntegration, userPrompt, maxTokens);
+      } else {
+        botResponse = "Unsupported integration type.";
       }
-    } else if (integrationType === "nutanix") {
-      // For Nutanix, call your dynamic proxy API route.
-      const url = "/api/proxy/nutanix";
-      const payload: any = {
-        model: "vllm-llama-3-1-8b", // Adjust as needed.
-        messages: [{ role: "user", content: messageInput }],
-        stream: false,
-      };
-      // Add max_tokens property from tokenMapping.
-      payload.max_tokens = tokenMapping[tokenSize];
-
-      console.log("Nutanix Proxy API Request URL:", url);
-      console.log("Nutanix Proxy API Request Payload:", payload);
-
-      try {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        console.log("Nutanix Proxy API Response Status:", response.status);
-        const responseText = await response.text();
-        console.log("Nutanix Proxy API Raw Response:", responseText);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${responseText}`);
-        }
-
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (jsonError) {
-          throw new Error("Failed to parse JSON: " + jsonError);
-        }
-
-        botResponse =
-          data?.choices?.[0]?.message?.content ||
-          "No response from Nutanix API.";
-      } catch (error) {
-        console.error("Error calling Nutanix API:", error);
-        botResponse = "Error calling Nutanix API.";
-      }
-    } else {
-      botResponse = "Unsupported integration type.";
+    } catch (error: any) {
+      console.error("Error in API call:", error);
+      botResponse = error.message || "Error calling API.";
     }
 
     // Append the bot's response.
     setMessages((prev) => [...prev, { role: "bot", text: botResponse }]);
-    setMessageInput("");
   }
 
   if (loadingIntegrations) {
@@ -179,70 +96,70 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold">AI Chatbot</h1>
+    <div className="container mx-auto p-4 max-w-7xl">
+      <h1 className="text-3xl font-bold text-center mb-6">AI Chatbot</h1>
 
-      {/* Integration Selector */}
-      <div className="flex items-center space-x-2">
-        <Label htmlFor="integrationSelect">Select Integration:</Label>
-        <Select
-          value={selectedIntegration?.id || ""}
-          onValueChange={(value: string) => {
-            const integration = integrations.find((i) => i.id === value);
-            if (integration) {
-              setSelectedIntegration(integration);
-            }
-          }}
-        >
-          <SelectTrigger id="integrationSelect" className="w-64">
-            <SelectValue placeholder="Select an integration" />
-          </SelectTrigger>
-          <SelectContent>
-            {integrations.map((integration) => (
-              <SelectItem key={integration.id} value={integration.id}>
-                {integration.name} ({integration.type})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Nutanix Max Tokens Selector (only visible if Nutanix integration is selected) */}
-      {selectedIntegration?.type === "nutanix" && (
+      {/* Integration & Token Selector */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 space-y-4 md:space-y-0">
         <div className="flex items-center space-x-2">
-          <Label htmlFor="tokenSizeSelect">Max Tokens:</Label>
+          <Label htmlFor="integrationSelect">Select Integration:</Label>
           <Select
-            value={tokenSize}
-            onValueChange={(value: string) =>
-              setTokenSize(value as TokenSize)
-            }
+            value={selectedIntegration?.id || ""}
+            onValueChange={(value: string) => {
+              const integration = integrations.find((i) => i.id === value);
+              if (integration) {
+                setSelectedIntegration(integration);
+              }
+            }}
           >
-            <SelectTrigger id="tokenSizeSelect" className="w-48">
-              <SelectValue placeholder="Select token size" />
+            <SelectTrigger id="integrationSelect" className="w-64">
+              <SelectValue placeholder="Select an integration" />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(tokenMapping).map(([key, tokens]) => (
-                <SelectItem key={key} value={key}>
-                  {key.charAt(0).toUpperCase() + key.slice(1)} ({tokens} tokens)
+              {integrations.map((integration) => (
+                <SelectItem key={integration.id} value={integration.id}>
+                  {integration.name} ({integration.type})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-      )}
+        {selectedIntegration?.type === "nutanix" && (
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="tokenSizeSelect">Max Tokens:</Label>
+            <Select
+              value={tokenSize}
+              onValueChange={(value: string) => setTokenSize(value as TokenSize)}
+            >
+              <SelectTrigger id="tokenSizeSelect" className="w-48">
+                <SelectValue placeholder="Select token size" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(tokenMapping).map(([key, tokens]) => (
+                  <SelectItem key={key} value={key}>
+                    {key.charAt(0).toUpperCase() + key.slice(1)} ({tokens} tokens)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
 
-      {/* Chat Conversation */}
-      <div className="border rounded p-4 h-80 overflow-y-auto bg-gray-50">
+      {/* Chat Conversation Container */}
+      <div
+        ref={chatContainerRef}
+        className="border shadow-md rounded p-4 overflow-auto bg-gray-50 h-96 md:h-[28rem] lg:h-[32rem] mb-6 resize max-h-[80vh]"
+        style={{ resize: "both" }}
+      >
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`mb-2 ${
-              msg.role === "user" ? "text-right" : "text-left"
-            }`}
+            className={`mb-2 ${msg.role === "user" ? "text-right" : "text-left"}`}
           >
             <span
               style={{ whiteSpace: "pre-wrap" }}
-              className={`inline-block p-2 rounded ${
+              className={`inline-block p-3 rounded ${
                 msg.role === "user" ? "bg-blue-200" : "bg-green-200"
               }`}
             >
@@ -253,7 +170,7 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Input */}
-      <form onSubmit={handleSendMessage} className="flex space-x-2">
+      <form onSubmit={handleSendMessage} className="flex space-x-2 mb-6">
         <Input
           type="text"
           placeholder="Type your message..."
@@ -261,7 +178,9 @@ export default function ChatPage() {
           onChange={(e) => setMessageInput(e.target.value)}
           className="flex-1"
         />
-        <Button type="submit">Send</Button>
+        <Button type="submit" className="px-6">
+          Send
+        </Button>
       </form>
     </div>
   );
