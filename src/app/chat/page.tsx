@@ -13,6 +13,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
+// Mapping for T-shirt sizes to max tokens.
+const tokenMapping = {
+  small: 256,
+  medium: 512,
+  large: 1024,
+  xl: 2048,
+};
+
+type TokenSize = keyof typeof tokenMapping;
+
 interface Integration {
   id: string;
   name: string;
@@ -34,6 +44,8 @@ export default function ChatPage() {
   const [messageInput, setMessageInput] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState<boolean>(true);
+  // New state for token size (only used for Nutanix integration).
+  const [tokenSize, setTokenSize] = useState<TokenSize>("medium");
 
   // Fetch integrations on mount.
   useEffect(() => {
@@ -111,12 +123,12 @@ export default function ChatPage() {
         botResponse = "Error calling Ollama API.";
       }
     } else if (integrationType === "nutanix") {
-      // For Nutanix, use your dynamic proxy API route.
+      // For Nutanix, call your dynamic proxy API route.
       const url = "/api/proxy/nutanix";
       const payload = {
         model: "vllm-llama-3-1-8b", // Adjust as needed.
         messages: [{ role: "user", content: messageInput }],
-        max_tokens: 10,
+        max_tokens: tokenMapping[tokenSize],
         stream: false,
       };
 
@@ -145,7 +157,6 @@ export default function ChatPage() {
           throw new Error("Failed to parse JSON: " + jsonError);
         }
 
-        // Nutanix API does not stream, so we parse the whole response.
         botResponse =
           data?.choices?.[0]?.message?.content ||
           "No response from Nutanix API.";
@@ -195,12 +206,38 @@ export default function ChatPage() {
         </Select>
       </div>
 
+      {/* Nutanix Max Tokens Selector (only visible if Nutanix integration is selected) */}
+      {selectedIntegration?.type === "nutanix" && (
+        <div className="flex items-center space-x-2">
+          <Label htmlFor="tokenSizeSelect">Max Tokens:</Label>
+          <Select
+            value={tokenSize}
+            onValueChange={(value: string) =>
+              setTokenSize(value as TokenSize)
+            }
+          >
+            <SelectTrigger id="tokenSizeSelect" className="w-48">
+              <SelectValue placeholder="Select token size" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(tokenMapping).map(([key, tokens]) => (
+                <SelectItem key={key} value={key}>
+                  {key.charAt(0).toUpperCase() + key.slice(1)} ({tokens} tokens)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* Chat Conversation */}
       <div className="border rounded p-4 h-80 overflow-y-auto bg-gray-50">
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`mb-2 ${msg.role === "user" ? "text-right" : "text-left"}`}
+            className={`mb-2 ${
+              msg.role === "user" ? "text-right" : "text-left"
+            }`}
           >
             <span
               style={{ whiteSpace: "pre-wrap" }}
