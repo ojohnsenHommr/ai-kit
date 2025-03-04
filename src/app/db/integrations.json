@@ -1,0 +1,20 @@
+{
+  "integrations": [
+    {
+      "id": "1741082739154",
+      "name": "llama2",
+      "type": "ollama",
+      "endpoint": "https://ai.trollfaret31.com",
+      "apiKey": "",
+      "active": true
+    },
+    {
+      "id": "1741084553469",
+      "name": "nutanix",
+      "type": "nutanix",
+      "endpoint": "https://ai.nutanix.com",
+      "apiKey": "cbd50a2a-e1b2-441c-bd08-c04b93aa4835",
+      "active": true
+    }
+  ]
+}

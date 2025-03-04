@@ -1,0 +1,234 @@
+// src/app/chat/page.tsx
+"use client";
+
+import React, { useEffect, useState, FormEvent } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+
+interface Integration {
+  id: string;
+  name: string;
+  type: string;
+  endpoint: string;
+  apiKey: string;
+  active: boolean;
+}
+
+interface Message {
+  role: "user" | "bot";
+  text: string;
+}
+
+export default function ChatPage() {
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [selectedIntegration, setSelectedIntegration] =
+    useState<Integration | null>(null);
+  const [messageInput, setMessageInput] = useState<string>("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loadingIntegrations, setLoadingIntegrations] = useState<boolean>(true);
+
+  // Fetch integrations on mount.
+  useEffect(() => {
+    async function fetchIntegrations() {
+      const res = await fetch("/api/integrations");
+      if (res.ok) {
+        const data: Integration[] = await res.json();
+        setIntegrations(data);
+        if (data.length > 0) {
+          setSelectedIntegration(data[0]);
+        }
+      }
+      setLoadingIntegrations(false);
+    }
+    fetchIntegrations();
+  }, []);
+
+  async function handleSendMessage(e: FormEvent) {
+    e.preventDefault();
+    if (!messageInput.trim() || !selectedIntegration) return;
+
+    // Append the user's message.
+    setMessages((prev) => [...prev, { role: "user", text: messageInput }]);
+
+    const integrationType = selectedIntegration.type;
+    let botResponse = "";
+
+    if (integrationType === "ollama") {
+      // Build URL: append '/api/generate' to the integration endpoint.
+      const url =
+        selectedIntegration.endpoint.replace(/\/$/, "") + "/api/generate";
+      const payload = {
+        model: "mistral", // Adjust as needed.
+        prompt: messageInput,
+      };
+
+      console.log("Ollama API Request URL:", url);
+      console.log("Ollama API Request Payload:", payload);
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        console.log("Ollama API Response Status:", response.status);
+        const responseText = await response.text();
+        console.log("Ollama API Raw Response:", responseText);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${responseText}`);
+        }
+
+        // Process streaming response: split by newline and parse each JSON object.
+        const lines = responseText
+          .split("\n")
+          .filter((line) => line.trim() !== "");
+        let combinedResponse = "";
+        lines.forEach((line) => {
+          try {
+            const parsed = JSON.parse(line);
+            combinedResponse += parsed.response;
+          } catch (err) {
+            console.error("Error parsing line:", line, err);
+          }
+        });
+        // Insert newlines before numbered items for readability.
+        const formattedResponse = combinedResponse
+          .replace(/(\d+\.\s)/g, "\n$1")
+          .trim();
+        botResponse = formattedResponse || "No response from Ollama API.";
+      } catch (error) {
+        console.error("Error calling Ollama API:", error);
+        botResponse = "Error calling Ollama API.";
+      }
+    } else if (integrationType === "nutanix") {
+      // Build URL: append '/api/v1/chat/completions' to the integration endpoint.
+      const url =
+        selectedIntegration.endpoint.replace(/\/$/, "") +
+        "/api/v1/chat/completions";
+      const payload = {
+        model: "vllm-llama-3-1-8b", // Adjust as needed.
+        messages: [{ role: "user", content: messageInput }],
+        max_tokens: 10,
+        stream: false,
+      };
+
+      console.log("Nutanix API Request URL:", url);
+      console.log("Nutanix API Request Payload:", payload);
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${selectedIntegration.apiKey}`,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+          mode: "cors",
+        });
+
+        console.log("Nutanix API Response Status:", response.status);
+        const responseText = await response.text();
+        console.log("Nutanix API Raw Response:", responseText);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${responseText}`);
+        }
+
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (jsonError) {
+          throw new Error("Failed to parse JSON: " + jsonError);
+        }
+
+        botResponse = data.response || "No response from Nutanix API.";
+      } catch (error) {
+        console.error("Error calling Nutanix API:", error);
+        botResponse = "Error calling Nutanix API.";
+      }
+    } else {
+      botResponse = "Unsupported integration type.";
+    }
+
+    // Append the bot's response.
+    setMessages((prev) => [...prev, { role: "bot", text: botResponse }]);
+    setMessageInput("");
+  }
+
+  if (loadingIntegrations) {
+    return <p>Loading integrations...</p>;
+  }
+
+  return (
+    <div className="container mx-auto p-4 space-y-6">
+      <h1 className="text-2xl font-bold">AI Chatbot</h1>
+
+      {/* Integration Selector */}
+      <div className="flex items-center space-x-2">
+        <Label htmlFor="integrationSelect">Select Integration:</Label>
+        <Select
+          value={selectedIntegration?.id || ""}
+          onValueChange={(value: string) => {
+            const integration = integrations.find((i) => i.id === value);
+            if (integration) {
+              setSelectedIntegration(integration);
+            }
+          }}
+        >
+          <SelectTrigger id="integrationSelect" className="w-64">
+            <SelectValue placeholder="Select an integration" />
+          </SelectTrigger>
+          <SelectContent>
+            {integrations.map((integration) => (
+              <SelectItem key={integration.id} value={integration.id}>
+                {integration.name} ({integration.type})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Chat Conversation */}
+      <div className="border rounded p-4 h-80 overflow-y-auto bg-gray-50">
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`mb-2 ${msg.role === "user" ? "text-right" : "text-left"}`}
+          >
+            <span
+              style={{ whiteSpace: "pre-wrap" }}
+              className={`inline-block p-2 rounded ${
+                msg.role === "user" ? "bg-blue-200" : "bg-green-200"
+              }`}
+            >
+              {msg.text}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Chat Input */}
+      <form onSubmit={handleSendMessage} className="flex space-x-2">
+        <Input
+          type="text"
+          placeholder="Type your message..."
+          value={messageInput}
+          onChange={(e) => setMessageInput(e.target.value)}
+          className="flex-1"
+        />
+        <Button type="submit">Send</Button>
+      </form>
+    </div>
+  );
+}
