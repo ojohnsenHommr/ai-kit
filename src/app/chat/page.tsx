@@ -14,14 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 // Mapping for T-shirt sizes to max tokens.
-const tokenMapping = {
+// "none" indicates no token limit.
+const tokenMapping: { [key in TokenSize]: number | null } = {
+  none: null,
   small: 256,
   medium: 512,
   large: 1024,
   xl: 2048,
 };
 
-type TokenSize = keyof typeof tokenMapping;
+type TokenSize = "none" | "small" | "medium" | "large" | "xl";
 
 interface Integration {
   id: string;
@@ -125,12 +127,16 @@ export default function ChatPage() {
     } else if (integrationType === "nutanix") {
       // For Nutanix, call your dynamic proxy API route.
       const url = "/api/proxy/nutanix";
-      const payload = {
+      // Build payload. Only add max_tokens if a token limit is selected.
+      const payload: any = {
         model: "vllm-llama-3-1-8b", // Adjust as needed.
         messages: [{ role: "user", content: messageInput }],
-        max_tokens: tokenMapping[tokenSize],
         stream: false,
       };
+      const maxTokens = tokenMapping[tokenSize];
+      if (maxTokens !== null) {
+        payload.max_tokens = maxTokens;
+      }
 
       console.log("Nutanix Proxy API Request URL:", url);
       console.log("Nutanix Proxy API Request Payload:", payload);
@@ -212,9 +218,7 @@ export default function ChatPage() {
           <Label htmlFor="tokenSizeSelect">Max Tokens:</Label>
           <Select
             value={tokenSize}
-            onValueChange={(value: string) =>
-              setTokenSize(value as TokenSize)
-            }
+            onValueChange={(value: string) => setTokenSize(value as TokenSize)}
           >
             <SelectTrigger id="tokenSizeSelect" className="w-48">
               <SelectValue placeholder="Select token size" />
@@ -222,7 +226,8 @@ export default function ChatPage() {
             <SelectContent>
               {Object.entries(tokenMapping).map(([key, tokens]) => (
                 <SelectItem key={key} value={key}>
-                  {key.charAt(0).toUpperCase() + key.slice(1)} ({tokens} tokens)
+                  {key.charAt(0).toUpperCase() + key.slice(1)}{" "}
+                  {tokens !== null ? `(${tokens} tokens)` : "(No limit)"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -235,9 +240,7 @@ export default function ChatPage() {
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`mb-2 ${
-              msg.role === "user" ? "text-right" : "text-left"
-            }`}
+            className={`mb-2 ${msg.role === "user" ? "text-right" : "text-left"}`}
           >
             <span
               style={{ whiteSpace: "pre-wrap" }}
