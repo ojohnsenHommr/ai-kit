@@ -21,7 +21,7 @@ export interface Integration {
     // Build the full URL by appending '/api/generate' to the endpoint.
     const url = integration.endpoint.replace(/\/$/, "") + "/api/generate";
     const payload = {
-      model: "mistral", // Adjust as needed.
+      model: "llama2:13b", // Adjust as needed.
       prompt,
     };
   

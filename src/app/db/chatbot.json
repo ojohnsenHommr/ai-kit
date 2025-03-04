@@ -1,0 +1,18 @@
+{
+  "sessions": [
+    {
+      "id": "1741098300545",
+      "title": "New Chat",
+      "messages": [
+        {
+          "role": "user",
+          "text": "Hello, tell me a funny joke about kubernetes"
+        },
+        {
+          "role": "bot",
+          "text": "Okay, here's one for you:\n\nWhy did the Kubernetes cluster go to therapy?\n\nBecause it had a lot of container-ized issues! 😄"
+        }
+      ]
+    }
+  ]
+}
