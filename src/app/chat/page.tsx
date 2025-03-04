@@ -29,7 +29,8 @@ interface Message {
 
 export default function ChatPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
+  const [selectedIntegration, setSelectedIntegration] =
+    useState<Integration | null>(null);
   const [messageInput, setMessageInput] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState<boolean>(true);
@@ -61,8 +62,9 @@ export default function ChatPage() {
     let botResponse = "";
 
     if (integrationType === "ollama") {
-      // For Ollama, build the URL from the integration's endpoint.
-      const url = selectedIntegration.endpoint.replace(/\/$/, "") + "/api/generate";
+      // Build the full URL by appending '/api/generate' to the endpoint.
+      const url =
+        selectedIntegration.endpoint.replace(/\/$/, "") + "/api/generate";
       const payload = {
         model: "mistral", // Adjust as needed.
         prompt: messageInput,
@@ -87,7 +89,9 @@ export default function ChatPage() {
         }
 
         // Process streaming response: split by newline and parse each JSON object.
-        const lines = responseText.split("\n").filter((line) => line.trim() !== "");
+        const lines = responseText
+          .split("\n")
+          .filter((line) => line.trim() !== "");
         let combinedResponse = "";
         lines.forEach((line) => {
           try {
@@ -98,14 +102,16 @@ export default function ChatPage() {
           }
         });
         // Insert newlines before numbered items for readability.
-        const formattedResponse = combinedResponse.replace(/(\d+\.\s)/g, "\n$1").trim();
+        const formattedResponse = combinedResponse
+          .replace(/(\d+\.\s)/g, "\n$1")
+          .trim();
         botResponse = formattedResponse || "No response from Ollama API.";
       } catch (error) {
         console.error("Error calling Ollama API:", error);
         botResponse = "Error calling Ollama API.";
       }
     } else if (integrationType === "nutanix") {
-      // For Nutanix, call your dynamic proxy API route.
+      // For Nutanix, use your dynamic proxy API route.
       const url = "/api/proxy/nutanix";
       const payload = {
         model: "vllm-llama-3-1-8b", // Adjust as needed.
@@ -139,7 +145,10 @@ export default function ChatPage() {
           throw new Error("Failed to parse JSON: " + jsonError);
         }
 
-        botResponse = data.response || "No response from Nutanix API.";
+        // Nutanix API does not stream, so we parse the whole response.
+        botResponse =
+          data?.choices?.[0]?.message?.content ||
+          "No response from Nutanix API.";
       } catch (error) {
         console.error("Error calling Nutanix API:", error);
         botResponse = "Error calling Nutanix API.";
