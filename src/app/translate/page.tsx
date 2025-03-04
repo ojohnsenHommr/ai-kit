@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Copy } from "lucide-react";
+import { Copy, Volume2 } from "lucide-react";
+import { useSpeechSynthesis } from "react-speech-kit";
 import { callOllamaAPI, callNutanixAPI, Integration } from "@/lib/apiHelper";
 
 type TranslationDirection = "CorporateToNormal" | "NormalToCorporate";
@@ -25,7 +26,10 @@ export default function TranslatePage() {
   const [outputText, setOutputText] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Fetch integrations on mount.
+  const { speak, voices } = useSpeechSynthesis();
+  // Select a natural-sounding English voice if available.
+  const englishVoice = voices.find((v) => v.lang.startsWith("en")) || undefined;
+
   useEffect(() => {
     async function fetchIntegrations() {
       const res = await fetch("/api/integrations");
@@ -45,19 +49,17 @@ export default function TranslatePage() {
     setOutputText("");
 
     // Build a prompt based on the translation direction.
-    // For CorporateToNormal, instruct the AI to deliver a brutally honest,
-    // irreverently funny, and unapologetically rude translation without any extra commentary.
+    // In CorporateToNormal, instruct the AI to be brutally honest, irreverent, and unapologetically rude.
     const prompt =
       translationDirection === "CorporateToNormal"
-        ? `Translate the following corporate language text into a brutally honest, irreverently funny, and unapologetically rude everyday version. Do not include any warnings, notes, or extra commentary – just the translated text:\n\n"${inputText}"`
-        : `Translate the following funny, honest, brutally everyday text into formal, polished corporate language. Do not include any warnings, notes, or extra commentary – just the translated text:\n\n"${inputText}"`;
+        ? `Translate the following corporate language text into an irreverently funny, brutally honest, and unapologetically rude everyday version. Do not include any warnings or notes—just the translated text:\n\n"${inputText}"`
+        : `Translate the following everyday text into polished, formal corporate language. Do not include any warnings or notes—just the translated text:\n\n"${inputText}"`;
 
     try {
       let response = "";
       if (selectedIntegration.type === "ollama") {
         response = await callOllamaAPI(selectedIntegration, prompt);
       } else if (selectedIntegration.type === "nutanix") {
-        // Use a default token limit for translation (e.g., 512 tokens)
         response = await callNutanixAPI(selectedIntegration, prompt, 512);
       } else {
         response = "Unsupported integration type.";
@@ -72,12 +74,12 @@ export default function TranslatePage() {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
-      <h1 className="text-3xl font-bold text-center mb-6">Translation Tool</h1>
-      
+    <div className="container mx-auto p-6 max-w-4xl space-y-6">
+      <h1 className="text-4xl font-extrabold text-center text-gray-900">Translation Tool</h1>
+
       {/* Integration Selector */}
-      <div className="mb-4">
-        <Label htmlFor="integrationSelect">Select Integration:</Label>
+      <div className="space-y-2">
+        <Label htmlFor="integrationSelect" className="text-lg font-medium">Select Integration:</Label>
         <Select
           value={selectedIntegration?.id || ""}
           onValueChange={(value: string) => {
@@ -85,10 +87,10 @@ export default function TranslatePage() {
             if (integration) setSelectedIntegration(integration);
           }}
         >
-          <SelectTrigger id="integrationSelect" className="w-64">
+          <SelectTrigger id="integrationSelect" className="w-64 border border-gray-300 rounded-md shadow-sm">
             <SelectValue placeholder="Select an integration" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="rounded-md shadow-lg">
             {integrations.map((integration) => (
               <SelectItem key={integration.id} value={integration.id}>
                 {integration.name} ({integration.type})
@@ -99,59 +101,85 @@ export default function TranslatePage() {
       </div>
 
       {/* Translation Direction Selector */}
-      <div className="mb-4">
-        <Label htmlFor="translationDirection">Translation Direction:</Label>
+      <div className="space-y-2">
+        <Label htmlFor="translationDirection" className="text-lg font-medium">Translation Direction:</Label>
         <Select
           value={translationDirection}
           onValueChange={(value: string) => setTranslationDirection(value as TranslationDirection)}
         >
-          <SelectTrigger id="translationDirection" className="w-64">
+          <SelectTrigger id="translationDirection" className="w-64 border border-gray-300 rounded-md shadow-sm">
             <SelectValue placeholder="Select translation direction" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="rounded-md shadow-lg">
             <SelectItem value="CorporateToNormal">Corporate → Normal</SelectItem>
             <SelectItem value="NormalToCorporate">Normal → Corporate</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* Input Text Area */}
-      <div className="mb-4">
-        <Label>Input Text:</Label>
-        <Textarea
-          placeholder="Enter text to translate..."
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          className="w-full h-40"
-        />
+      {/* Input Text Area with Speaker Button */}
+      <div className="space-y-2">
+        <Label className="text-lg font-medium">Input Text:</Label>
+        <div className="relative">
+          <Textarea
+            placeholder="Enter text to translate..."
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            className="w-full h-40 border border-gray-300 rounded-md shadow-sm"
+          />
+          {inputText && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute bottom-2 right-2 p-1"
+              onClick={() =>
+                speak({ text: inputText, voice: englishVoice, rate: 0.9, pitch: 1.1 })
+              }
+            >
+              <Volume2 className="h-5 w-5 text-gray-600" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Translate Button */}
-      <div className="mb-4">
-        <Button onClick={handleTranslate} disabled={loading}>
+      <div>
+        <Button onClick={handleTranslate} disabled={loading} className="w-full py-3 text-lg">
           {loading ? "Translating..." : "Translate"}
         </Button>
       </div>
 
-      {/* Output Text Area with Copy Button */}
-      <div className="mb-4">
-        <Label>Translated Output:</Label>
+      {/* Output Text Area with Copy & Speaker Buttons */}
+      <div className="space-y-2">
+        <Label className="text-lg font-medium">Translated Output:</Label>
         <div className="relative">
           <Textarea
             readOnly
             placeholder="Translation will appear here..."
             value={outputText}
-            className="w-full h-40 pr-10"
+            className="w-full h-40 pr-16 border border-gray-300 rounded-md shadow-sm"
           />
           {outputText && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute bottom-2 right-2 p-1"
-              onClick={() => navigator.clipboard.writeText(outputText)}
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute bottom-2 right-10 p-1"
+                onClick={() => navigator.clipboard.writeText(outputText)}
+              >
+                <Copy className="h-5 w-5 text-gray-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute bottom-2 right-2 p-1"
+                onClick={() =>
+                  speak({ text: outputText, voice: englishVoice, rate: 0.9, pitch: 1.1 })
+                }
+              >
+                <Volume2 className="h-5 w-5 text-gray-600" />
+              </Button>
+            </>
           )}
         </div>
       </div>
