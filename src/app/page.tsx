@@ -26,6 +26,11 @@ const cards = [
     infoText: "Generate code for web apps with our CodeGen tool.",
     route: "/codegen",
   },
+  {
+    title: "corp.inc Jira-Helper",
+    infoText: "Make jira usefull for everyone",
+    route: "/jira-helper",
+  },
 ];
 
 export default function HomePage() {

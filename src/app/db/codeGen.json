@@ -1,3 +1,18 @@
 {
-  "sessions": []
+  "sessions": [
+    {
+      "id": "1741101808746",
+      "title": "New CodeGen Session",
+      "messages": [
+        {
+          "role": "user",
+          "text": "i have my next.js project up and running with typescript and tailwindcss\ngive me nice page.tsx to use as my lading page for our it documentation page"
+        },
+        {
+          "role": "bot",
+          "text": "Here is a sample `pages/index.tsx` file that you can use as your landing page for your IT documentation:\n```typescript\nimport { NextPage } from 'next';\nimport Head from 'next/head';\nimport styles from './index.module.css';\n\nconst IndexPage: NextPage = () => {\n  return (\n    <div className={styles.container}>\n      <Head>\n        <title>IT Documentation</title>\n      </Head>\n      <h1 className={styles.heading}>IT Documentation</h1>\n      <p className={styles.subheading}>Welcome to our IT documentation page.</p>\n      <ul className={styles.list}>\n        {/* Add links to your other pages here */}\n        <li><a href=\"/about\">About Us</a></li>\n        <li><a href=\"/services\">Services</a></li>\n        <li><a href=\"/contact\">Contact Us</a></li>\n      </ul>\n    </div>\n  );\n};\n\nexport default IndexPage;\n```\nThis code uses the `Head` component from Next.js to set the title of the page, and then creates a basic layout with an H1 header and a list of links to other pages on your site. You can customize this code as needed to fit your specific requirements."
+        }
+      ]
+    }
+  ]
 }
